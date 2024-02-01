@@ -193,11 +193,14 @@ class MinesweeperAI():
                if they can be inferred from existing knowledge
         """
         self.moves_made.add(cell)  # 1) mark the cell as a move already made
-        self.mark_safe(cell)  # 2) mark the cell as safe
+        
+        if cell not in self.safes:
+            self.mark_safe(cell)  # 2) mark the cell as safe
 
         undeterminedCells = []
         numMines = 0
 
+        # must only include cells that are undertermined
         for i in range(cell[0] - 1, cell[0] + 2):
             for j in range(cell[1] - 1, cell[1] + 2):
                 if (i, j) in self.mines:
@@ -209,21 +212,27 @@ class MinesweeperAI():
         self.knowledge.append(statement)  # 3) add sentence to knowledge base
 
         for sentence in self.knowledge:  # 4) mark additional cells as safe or as mines
-            if sentence.known_mines():
-                for cell in sentence.known_mines().copy():
-                    self.mark_mine(cell)
-            if sentence.known_safes():
-                for cell in sentence.known_safes().copy():
-                    self.mark_safe(cell)
+            if len(sentence.cells) == 0:
+                self.knowledge.remove(sentence)
+            safe_cells = list(sentence.known_safes())
+            mines = list(sentence.known_mines())
+            for safe in safe_cells:
+                self.mark_safe(safe)
+            for mine in mines:
+                self.mark_mine(mine)
 
-        for sentence in self.knowledge:
-            if statement.cells.issubset(sentence.cells) and sentence.count > 0 and statement.count > 0 and statement != sentence:
-                newSubset = sentence.cells.difference(statement.cells)
-                newSentenceSubset = Sentence(list(newSubset), sentence.count - statement.count)
-                self.knowledge.append(newSentenceSubset)
-
-
-
+        new_knowledge = []
+        for following_statement in self.knowledge:
+            if len(following_statement.cells) == 0:
+                self.knowledge.remove(following_statement)
+            elif statement == following_statement:
+                break
+            elif statement.cells <= following_statement.cells:
+                uniqueSet = following_statement.cells - statement.cells
+                diffNum = following_statement.count - statement.count
+                new_knowledge.append(Sentence(uniqueSet, diffNum))
+            statement = following_statement
+        self.knowledge += new_knowledge
 
     def make_safe_move(self):
         """
